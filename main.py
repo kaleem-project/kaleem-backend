@@ -74,6 +74,20 @@ def forget_password() -> tuple[Response, int]:
         return jsonify({"message": "We have send reset password link to your email","code": 200}), 200
 
 
+@app.route("/api/v1/signin", methods=["POST"])
+def check_user() -> dict:
+    # try:
+    body = json.loads(request.data.decode())
+    user_email = body["email"]
+    user_password = body["password"]
+    result = database_obj.getRecords({"email": user_email, "password": user_password}, "Accounts")
+    if len(result) == 0:
+        return jsonify({"message": "Invalid credentials", "code": 400}), 400
+    thirty_days_in_min = 30*24*60 
+    token = generate_jwt(SECRET_KEY, thirty_days_in_min, {"user_id": str(result[0]["_id"])})
+    return jsonify({"message": "user authenticated successfully", "token": token, "user_id": str(result[0]["_id"]), "code": 200}), 200
+
+
 @app.route("/api/v1/signup", methods=["POST"])
 def signup():
     body = json.loads(request.data.decode())
