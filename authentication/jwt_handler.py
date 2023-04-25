@@ -9,8 +9,8 @@ import os
 secret = "5a26829c32d8d2e27330612f4270ffef62e0ef200a6f634d3a7009b8dbdf434e"
 
 def generate_jwt(secret: str, time_window: int, payload: dict) -> str:
-    expiration_time = datetime.datetime.utcnow() + datetime.timedelta(days=time_window)
-    payload["expiration_time"] = expiration_time.timestamp()
+    expiration_time = datetime.datetime.now() + datetime.timedelta(minutes=time_window)
+    payload["exp"] = expiration_time.timestamp()
     token = jwt.encode(payload, secret)
     return token
 

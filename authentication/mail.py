@@ -41,10 +41,13 @@ def load_reset_template() -> str:
         content = template.read()
     return content
 
+def load_confirmation_template() -> str:
+    os.chdir(os.path.dirname(__file__))
+    print(os.getcwd())
+    with open("confirmation_template.html", "r") as template:
+        content = template.read()
+    return content
+
 
 if __name__ == "__main__":
-    # subject: str, receiver: str, body: str
     email_server = MailServer()
-    b = load_reset_template()
-    message = Message("Test server", "m3t4n0y3t@gmail.com", b)
-    email_server.send(message.get_message())

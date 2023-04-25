@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;700&display=swap" rel="stylesheet"/>
+    <title>Confirmation Email</title>
+  </head>
+  <body style=" font-family: sans-serif; height: 100vh; background-color: #fff; font-family: 'Ubuntu', sans-serif; direction: ltr;">
+    <div
+      class="container"
+      style="margin-left: 30px; margin-top: 50px; direction: ltr; font-family: 'Ubuntu', sans-serif;">
+      <div style="display: flex; align-items: center; gap: 10px">
+        <img
+          class="email-logo"
+          style="width: 50px; align-self: center"
+          src="https://user-images.githubusercontent.com/66681251/223025159-eae1f83d-97ec-4f7c-916e-306cf8adfd6b.png"
+        />
+        <div
+          style="
+            font-size: 2.6rem;
+            font-weight: bold;
+            letter-spacing: 1px;
+            color: #241849;
+          "
+        >
+          KALEEM
+        </div>
+      </div>
+      <h1 class="header" style="color: #241849; margin-bottom: 22px">
+        Hi __FIRST_NAME__,
+      </h1>
+
+      <p
+        class="mail-content"
+        id="action-content"
+        style="
+          font-size: 12px;
+          color: #777;
+          font-weight: bold;
+          line-height: 1.5;
+        "
+      >
+        Please select the button below to verify your account, you should verify your email to start using our app. <br />
+      </p>
+
+      <a
+        class="submit action"
+        style="
+          width: 95px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          align-self: center;
+          gap: 8px;
+          border: none;
+          text-align: center;
+          border-radius: 100px;
+          background-color: #7950f2;
+          cursor: pointer;
+          color: #fff;
+          padding: 8px 14px;
+          font-size: 13px;
+          font-weight: bold;
+          text-decoration: none;
+          transition: all 0.3s;
+          font-family: 'Ubuntu', sans-serif;
+          margin-bottom: 30px;
+        "
+        id="action"
+        target="_blank"
+        href="__CONFIRMATION_LINK__"
+        >Confirm email</a>
+      <p
+        class="mail-content"
+        id="show-content"
+        style="
+          font-size: 12px;
+          color: #777;
+          font-weight: bold;
+          line-height: 1.5;
+        "
+      >
+        <span style="color: #241849">Note that:</span> our verification link
+        will expire in 10 minutes, so make sure you use it as soon as you can.
+      </p>
+
+      <p
+        class="mail-content"
+        id="action-content"
+        style="
+          font-size: 12px;
+          color: #777;
+          font-weight: bold;
+          line-height: 1.5;
+        "
+      >
+        Thanks, <br />
+        <strong>Kaleem Support Team.</strong>
+      </p>
+    </div>
+  </body>
+</html>
