@@ -20,10 +20,12 @@ class DataabseAPI:
         monog_obj = collection.find_one({"_id": recid})
         return monog_obj
     
-    def updateRecord(self, recid: str, data: dict, collection: str) -> Optional[dict]:
+    def updateRecord(self, recid: str, data: dict, collection: str) -> Optional[dict | int]:
         collection = self.database_connection[collection]
-        monog_obj = collection.update_one({'_id':recid}, { '$set':data})
-        return monog_obj
+        if collection.find_one({"_id": recid}) != None:
+            monog_obj = collection.update_one({'_id':recid}, { '$set':data})
+            return monog_obj
+        return -1
     
     def deleteRecordById(self, recid: str, collection: str) -> dict:
         doc = self.getRecordById(recid, collection)
