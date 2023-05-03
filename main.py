@@ -60,15 +60,16 @@ def reset_password(user_token) -> Response | tuple[Response, int] | str:
 @app.route("/api/v1/forget", methods=["GET"])
 def forget_password() -> tuple[Response, int]:
     body = json.loads(request.data.decode())
-    print(body)
     user_email = body["email"]
     result = database_obj.getRecords({"email": user_email}, "Accounts")
     if len(result) == 0:
         return jsonify({"message": "Invalid email address", "code": 400}), 400
     else:
-        first_name = result[0]["firstName"]
+        first_name = result[0]["first_name"]
         email_server = MailServer()
         message_body = load_reset_template()
+        message_body = message_body.replace("__EMAIL__", user_email)
+        message_body = message_body.replace("__FIRST_NAME__", first_name)
         message = Message("Reset email password", user_email, message_body)
         email_server.send(message.get_message())
         return jsonify({"message": "We have send reset password link to your email","code": 200}), 200
@@ -128,6 +129,7 @@ def generate_confirmation_token():
         token = generate_jwt(SECRET_KEY, 10, {"topic": "confirmation",
                                             "account_id": account_id,
                                             "email": email})
+        # TODO: Change this link to frontend link.
         conf_link = "https://127.0.0.1:5000/api/v1/confirmation/" + token
         return jsonify({"message": "Account is already confirmed", 
                         "confirmation_link": conf_link, "code": 200}), 200
