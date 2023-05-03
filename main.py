@@ -75,6 +75,20 @@ def forget_password() -> tuple[Response, int]:
         return jsonify({"message": "We have send reset password link to your email","code": 200}), 200
 
 
+@app.route("/api/v1/signin", methods=["POST"])
+def check_user() -> dict:
+    # try:
+    body = json.loads(request.data.decode())
+    user_email = body["email"]
+    user_password = body["password"]
+    result = database_obj.getRecords({"email": user_email, "password": user_password}, "Accounts")
+    if len(result) == 0:
+        return jsonify({"message": "Invalid credentials", "code": 400}), 400
+    thirty_days_in_min = 30*24*60 
+    token = generate_jwt(SECRET_KEY, thirty_days_in_min, {"user_id": str(result[0]["_id"])})
+    return jsonify({"message": "user authenticated successfully", "token": token, "user_id": str(result[0]["_id"]), "code": 200}), 200
+
+
 @app.route("/api/v1/signup", methods=["POST"])
 def signup():
     body = json.loads(request.data.decode())
@@ -148,6 +162,67 @@ def confirmation(token):
     except Exception as error:
         return jsonify({"message": "Token expired!","code": 400}), 400
     return jsonify({"message": "Account confirmed successfully","code": 200}), 200
+
+
+@app.route("/api/v1/room", methods=["POST"])
+@token_required
+def create_room():
+    body = json.loads(request.data.decode())
+    try:
+        new_room = {
+            "invitation_link": "",
+            "is_ended": False,
+            "type": body["type"],
+            "members": {},
+            "permissions": {},
+            "room_admin": body["room_admin"],
+            "status": "",
+            "chat_channel": "" , # TODO: generating Chat Room record ad append its ID
+            "creation_time": str(current_time())
+        }
+        result = database_obj.createRecord(new_room, "Rooms")
+        print(new_room)
+        return jsonify({"message": "room created successfully", "room_id": str(result), "code": 201}), 201
+    except Exception as error:
+        return jsonify({"message": str(error), "code": 400}), 400
+
+
+@app.route("/api/v1/room/<room_id>", methods=["GET"])
+@token_required
+def get_room(room_id):
+    try:  
+        result = database_obj.getRecords({"_id": ObjectId(room_id)}, "Rooms")
+        if len(result) == 0:
+            return jsonify({"message": "Invalid room ID", "code": 400}), 400
+        result[0]["_id"] = str(result[0]["_id"])
+        return jsonify({"message": "room retrieved successfully", "data": result, "code": 200}), 200
+    except Exception as error:
+        return jsonify({"message":str(error), "code": 400}), 400
+
+
+@app.route("/api/v1/room/<room_id>", methods=["PUT"])
+@token_required
+def update_room(room_id):
+    try:
+        body = json.loads(request.data.decode())
+        result = database_obj.updateRecord(ObjectId(room_id), body, "Rooms")
+        if result != -1:
+            return jsonify({"message": "room updated successfully", "code": 200}), 200 
+        return jsonify({"message": "Invalid room ID", "code": 400}), 400
+    except Exception as error:
+        return jsonify({"message":str(error), "code": 400}), 400
+
+
+@app.route("/api/v1/room/<room_id>", methods=["DELETE"])
+@token_required
+def delete_room(room_id):
+    try:
+        result = database_obj.deleteRecordById(ObjectId(room_id), "Rooms")
+        if result is None:
+            return jsonify({"message": "Invalid room ID", "code": 400}), 400       
+        return jsonify({"message": "room deleted successfully", "code": 200}), 200 
+    except Exception as error:
+        return jsonify({"message":str(error), "code": 400}), 400
 
 
 if __name__ == '__main__':

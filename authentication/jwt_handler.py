@@ -40,3 +40,8 @@ def token_required(func):
             return jsonify({'Message': 'Invalid token'}), 403
         return func(*args, **kwargs)
     return decorated
+
+
+
+if __name__ == "__main__":
+    pass
