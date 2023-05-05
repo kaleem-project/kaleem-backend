@@ -120,7 +120,7 @@ def signup():
         token = generate_jwt(SECRET_KEY, 10, {"topic": "confirmation",
                                              "account_id": str(result),
                                              "email": body["email"]})
-        conf_link = "https://127.0.0.1:5000/api/v1/confirmation/" + token
+        conf_link = "http://localhost:3000/confirmation/" + token
         message_body = message_body.replace("__CONFIRMATION_LINK__", conf_link)
         message = Message("Confirmation Email", body["email"], message_body)
         # email_server.send(message.get_message())
@@ -144,30 +144,37 @@ def generate_confirmation_token():
                                             "account_id": account_id,
                                             "email": email})
         # TODO: Change this link to frontend link.
-        conf_link = "https://127.0.0.1:5000/api/v1/confirmation/" + token
+        conf_link = "http://localhost:3000/confirmation/" + token
         return jsonify({"message": "Account is already confirmed", 
                         "confirmation_link": conf_link, "code": 200}), 200
     else:
         return jsonify({"message": "Account is already confirmed", "code": 400}), 400
 
 
-@app.route("/api/v1/confirmation/<token>", methods=["GET"])
+@app.route("/api/v1/confirmation/<token>", methods=["POST"])
 def confirmation(token):
     try:
         result = decode_jwt(SECRET_KEY, token)
         account_id = result["account_id"]
         topic = result["topic"]
         if topic == "confirmation":
-            database_obj.updateRecord(ObjectId(account_id), {"is_confirmed": True}, "Accounts")
+            account_record = database_obj.getRecordById(ObjectId(account_id), "Accounts")
+            confirmation_status = account_record["is_confirmed"]
+            if confirmation_status:
+                return jsonify({"message": "This Account is already confirmed","code": 400}), 400
+            else:
+                database_obj.updateRecord(ObjectId(account_id), {"is_confirmed": True}, "Accounts")
+                return jsonify({"message": "Account confirmed successfully","code": 200}), 200    
     except Exception as error:
         return jsonify({"message": "Token expired!","code": 400}), 400
-    return jsonify({"message": "Account confirmed successfully","code": 200}), 200
+    
 
 
 @app.route("/api/v1/room", methods=["POST"])
 @token_required
 def create_room():
     body = json.loads(request.data.decode())
+    
     try:
         new_room = {
             "invitation_link": "",
@@ -181,7 +188,6 @@ def create_room():
             "creation_time": str(current_time())
         }
         result = database_obj.createRecord(new_room, "Rooms")
-        print(new_room)
         return jsonify({"message": "room created successfully", "room_id": str(result), "code": 201}), 201
     except Exception as error:
         return jsonify({"message": str(error), "code": 400}), 400

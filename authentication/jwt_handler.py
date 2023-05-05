@@ -6,6 +6,7 @@ import datetime
 import json
 import os
 
+#TODO: don't forget to delete this line.
 secret = "5a26829c32d8d2e27330612f4270ffef62e0ef200a6f634d3a7009b8dbdf434e"
 
 def generate_jwt(secret: str, time_window: int, payload: dict) -> str:
@@ -40,7 +41,6 @@ def token_required(func):
             return jsonify({'Message': 'Invalid token'}), 403
         return func(*args, **kwargs)
     return decorated
-
 
 
 if __name__ == "__main__":
