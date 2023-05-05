@@ -127,9 +127,9 @@ def signup():
         t1 = threading.Thread(target=email_server.send, args=(message.get_message(),))
         t1.start()
         return jsonify({"message": "Account created successfully and mail sent",
-                    "account_id": result,
+                    "account_id": str(result),
                     "code": 201}), 201
-    except Exception as DuplicateKeyError:
+    except Exception as error:
         return jsonify({"message": "Duplicated email or username", "code": 400}), 400
 
 
