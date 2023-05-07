@@ -57,7 +57,7 @@ def reset_password(user_token) -> Response | tuple[Response, int] | str:
         return jsonify({"message": "Invalid authentication token", "code": 400}), 400
     return ""
 
-@app.route("/api/v1/forget", methods=["GET"])
+@app.route("/api/v1/forget", methods=["POST"])
 def forget_password() -> tuple[Response, int]:
     body = json.loads(request.data.decode())
     user_email = body["email"]
@@ -66,10 +66,18 @@ def forget_password() -> tuple[Response, int]:
         return jsonify({"message": "Invalid email address", "code": 400}), 400
     else:
         first_name = result[0]["first_name"]
+        # Generate token
+        token = generate_jwt(SECRET_KEY,
+                             30,
+                             {"topic": "reset-password", 
+                              "user_id": str(result[0]["_id"])})
         email_server = MailServer()
         message_body = load_reset_template()
+        # Form the reset email template
         message_body = message_body.replace("__EMAIL__", user_email)
         message_body = message_body.replace("__FIRST_NAME__", first_name)
+        reset_url_link = "http://localhost:3000/reset/" + token
+        message_body = message_body.replace("__LINK__", reset_url_link)
         message = Message("Reset email password", user_email, message_body)
         email_server.send(message.get_message())
         return jsonify({"message": "We have send reset password link to your email","code": 200}), 200
