@@ -122,6 +122,7 @@ def signup():
             "profile_image": body["profileImage"],
             "country": body["country"],
             "first_login": True,
+            "type": body["type"],
         }
         # Adding system fields
         new_account["creation_time"] = str(current_time())
