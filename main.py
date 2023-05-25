@@ -81,7 +81,8 @@ def forget_password() -> tuple[Response, int]:
         # Form the reset email template
         message_body = message_body.replace("__EMAIL__", user_email)
         message_body = message_body.replace("__FIRST_NAME__", first_name)
-        reset_url_link = "http://localhost:3000/reset/" + token
+        reset_url_link = "http://localhost:3000/reset/" + \
+            token + "&rwnc=qgelgl&pryqvmb=obpbqmxpptloa"
         message_body = message_body.replace("__LINK__", reset_url_link)
         message = Message("Reset email password", user_email, message_body)
         email_server.send(message.get_message())
@@ -137,7 +138,7 @@ def signup():
         token = generate_jwt(SECRET_KEY, 10, {"topic": "confirmation",
                                               "account_id": str(result),
                                               "email": body["email"]})
-        conf_link = "http://localhost:3000/confirmation/" + token
+        conf_link = "http://localhost:3000/confirmation/" + token + "&rwnc=pfdkrm"
         message_body = message_body.replace("__CONFIRMATION_LINK__", conf_link)
         message = Message("Confirmation Email", body["email"], message_body)
         # email_server.send(message.get_message())
@@ -173,7 +174,7 @@ def generate_confirmation_token():
                                               "account_id": account_id,
                                               "email": email})
         # TODO: Change this link to frontend link.
-        conf_link = "http://localhost:3000/confirmation/" + token
+        conf_link = "http://localhost:3000/confirmation/" + token + "&rwnc=pfdkrm"
         return jsonify({"message": "Account is already confirmed",
                         "confirmation_link": conf_link, "code": 200}), 200
     else:
