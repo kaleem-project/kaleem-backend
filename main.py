@@ -173,7 +173,6 @@ def generate_confirmation_token():
         token = generate_jwt(SECRET_KEY, 10, {"topic": "confirmation",
                                               "account_id": account_id,
                                               "email": email})
-        # TODO: Change this link to frontend link.
         conf_link = "http://localhost:3000/confirmation/" + token + "&rwnc=pfdkrm"
         return jsonify({"message": "Account is already confirmed",
                         "confirmation_link": conf_link, "code": 200}), 200
