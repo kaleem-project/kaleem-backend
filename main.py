@@ -1,5 +1,4 @@
 import json
-from typing import Tuple
 from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 from bson import ObjectId
@@ -29,21 +28,21 @@ database_obj = DataabseAPI(DB_URI, DB_NAME)
 @app.route("/api/v1/auth", methods=["GET"])
 def auth() -> Response:
     body = json.loads(request.data.decode())
-    if "username" in body.keys() and "password" in body.keys():
-        username, password = body["username"], body["password"]
+    if "email" in body.keys() and "password" in body.keys():
+        email, password = body["email"], body["password"]
         db_obj = DataabseAPI(DB_URI, DB_NAME)
-        # search for this username in db
+        # search for this email in db
         result = db_obj.getRecords(
-            {"username": username, "password": password}, "Accounts")
+            {"email": email, "password": password}, "Accounts")
         if len(result) == 1:
             user_map = {"id": str(result[0]["_id"]), "email": str(
                 result[0]["email"]), "topic": "login"}
             token = generate_jwt(SECRET_KEY, TIME_WINDOW, user_map)
             return jsonify({"data": {"token": token}, "code": 200})
         else:
-            return jsonify({"message": "<username> or <password> is incorrect", "code": 400})
+            return jsonify({"message": "<email> or <password> is incorrect", "code": 400})
     else:
-        return jsonify({"message": "<username> or <password> key is missing", "code": 400})
+        return jsonify({"message": "<email> or <password> key is missing", "code": 400})
 
 
 @app.route("/api/v1/reset/<user_token>", methods=["POST"])
@@ -110,9 +109,7 @@ def signup():
     body = json.loads(request.data.decode())
     try:
         new_account = {
-            "username": body["username"],
             "email": body["email"],
-            "username": body["username"],
             "password": body["password"],
             "first_name": body["firstName"],
             "last_name": body["lastName"],
@@ -149,7 +146,7 @@ def signup():
                         "account_id": str(result),
                         "code": 201}), 201
     except Exception as error:
-        return jsonify({"message": "Duplicated email or username", "code": 400}), 400
+        return jsonify({"message": "Duplicated email", "code": 400}), 400
 
 
 @app.route("/api/v1/account/<id>", methods=["PUT"])
