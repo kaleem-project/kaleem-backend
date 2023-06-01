@@ -6,6 +6,7 @@ from authentication.jwt_handler import token_required, generate_jwt, decode_jwt
 from authentication.mail import Message, load_reset_template, MailServer, load_confirmation_template
 from utils.config_handler import read_json
 from utils.time_functions import current_time
+from utils.room_util_functions import generate_id
 from database.database_api import DataabseAPI
 import os
 import threading
@@ -212,21 +213,28 @@ def confirmation(token):
 @token_required
 def create_room():
     body = json.loads(request.data.decode())
-
     try:
+        generated_room_id = generate_id()
+        while generated_room_id != None:
+            result = database_obj.getRecords(
+                {"room_id": generated_room_id}, "ٌRooms")
+            if len(result) != 0:
+                generated_room_id = generate_id()
+                continue
+            else:
+                break
+        # TODO: implement required functions for scheduling rooms
         new_room = {
-            "invitation_link": "",
+            "invitation_link": "http://localhost:3000/" + generated_room_id,
+            "room_id": generated_room_id,
             "is_ended": False,
             "type": body["type"],
             "members": {},
-            "permissions": {},
             "room_admin": body["room_admin"],
-            "status": "",
-            "chat_channel": "",  # TODO: generating Chat Room record ad append its ID
             "creation_time": str(current_time())
         }
         result = database_obj.createRecord(new_room, "Rooms")
-        return jsonify({"message": "room created successfully", "room_id": str(result), "code": 201}), 201
+        return jsonify({"message": "room created successfully", "room_id": str("result"), "code": 201}), 201
     except Exception as error:
         return jsonify({"message": str(error), "code": 400}), 400
 
@@ -235,7 +243,7 @@ def create_room():
 @token_required
 def get_room(room_id):
     try:
-        result = database_obj.getRecords({"_id": ObjectId(room_id)}, "Rooms")
+        result = database_obj.getRecords({"room_id": room_id}, "Rooms")
         if len(result) == 0:
             return jsonify({"message": "Invalid room ID", "code": 400}), 400
         result[0]["_id"] = str(result[0]["_id"])
