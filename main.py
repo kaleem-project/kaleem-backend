@@ -46,7 +46,7 @@ def auth() -> Response:
         return jsonify({"message": "<username> or <password> key is missing", "code": 400})
 
 
-@app.route("/api/v1/reset/<user_token>", methods=["GET"])
+@app.route("/api/v1/reset/<user_token>", methods=["POST"])
 def reset_password(user_token) -> Response | tuple[Response, int] | str:
     try:
         result = decode_jwt(SECRET_KEY, user_token)
