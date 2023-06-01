@@ -163,6 +163,17 @@ def update_account(id):
         return jsonify({"message": str(error), "code": 400}), 400
 
 
+@app.route("/api/v1/account/<id>", methods=["GET"])
+@token_required
+def get_account(id):
+    try:
+        result = database_obj.getRecordById(ObjectId(id), "Accounts")
+        result["_id"] = str(result["_id"])
+        return jsonify({"data": result, "code": 200}), 200
+    except Exception as error:
+        return jsonify({"message": str(error), "code": 400}), 400
+
+
 @app.route("/api/v1/confirmation/gen", methods=["GET"])
 def generate_confirmation_token():
     body = json.loads(request.data.decode())
