@@ -1,9 +1,17 @@
+#!bin/bash
+import jwt
 import json
 from flask import Flask, request, jsonify, Response
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from flask_cors import CORS
+import pymongo
 from bson import ObjectId
+import bson
+from logging_api.logs_api import LogSystem
 from authentication.jwt_handler import token_required, generate_jwt, decode_jwt
 from authentication.mail import Message, load_reset_template, MailServer, load_confirmation_template
+from utils.request_data_handler import get_request_metadata
 from utils.config_handler import read_json
 from utils.time_functions import current_time
 from utils.room_util_functions import generate_id
@@ -13,102 +21,114 @@ import threading
 
 # Initialize flask instance of our application
 app = Flask(__name__)
+
+# Initialize the rate limit handler
+limiter = Limiter(get_remote_address, app=app, default_limits=["1000 per day", "50 per hour"])
+
 # Enable interaction with external components such as frontend
 CORS(app)
 
-# Reading Application configurations
+
+# Reading Application configurations from configs.json file.
 os.chdir(os.path.dirname(__file__))
 config = read_json("configs.json")
 SECRET_KEY = config["secret_key"]
 TIME_WINDOW = config["time_window_in_minuts"]
 DB_URI = config["DB_URI"]
 DB_NAME = config["DB_NAME"]
+BASE_FRONTEND_LINK = config["frontend_link"]
+
+# Initialize database handler.
 database_obj = DataabseAPI(DB_URI, DB_NAME)
-
-
-@app.route("/api/v1/auth", methods=["GET"])
-def auth() -> Response:
-    body = json.loads(request.data.decode())
-    if "email" in body.keys() and "password" in body.keys():
-        email, password = body["email"], body["password"]
-        db_obj = DataabseAPI(DB_URI, DB_NAME)
-        # search for this email in db
-        result = db_obj.getRecords(
-            {"email": email, "password": password}, "Accounts")
-        if len(result) == 1:
-            user_map = {"id": str(result[0]["_id"]), "email": str(
-                result[0]["email"]), "topic": "login"}
-            token = generate_jwt(SECRET_KEY, TIME_WINDOW, user_map)
-            return jsonify({"data": {"token": token}, "code": 200})
-        else:
-            return jsonify({"message": "<email> or <password> is incorrect", "code": 400})
-    else:
-        return jsonify({"message": "<email> or <password> key is missing", "code": 400})
-
+log_obj = LogSystem()
 
 @app.route("/api/v1/reset/<user_token>", methods=["POST"])
+@limiter.limit("5 per minute")
 def reset_password(user_token) -> Response | tuple[Response, int] | str:
+    external_addr, time_now = get_request_metadata()
     try:
         result = decode_jwt(SECRET_KEY, user_token)
         body = json.loads(request.data.decode())
         new_password = body["new_password"]
+        if len(new_password) == 0 or len(new_password) > 50:
+            return jsonify({"message": "Invalid password value can't be empty or more than 50 char.", "code": 400})
         user_id, topic = result["user_id"], result["topic"]
-        if topic == "reset-password" and user_id != "":
+        if user_id == "":
+            return jsonify({"message": "Invalid user id.", "code": 400})
+        if topic == "reset-password":
             result = database_obj.updateRecord(
                 ObjectId(user_id), {"password": new_password}, "Accounts")
             return jsonify({"message": "Password updated successfully", "code": 200})
-    except:
-        return jsonify({"message": "Invalid authentication token", "code": 400}), 400
-    return ""
+    except (jwt.exceptions.InvalidAlgorithmError,           # altered hashing algorithm
+            jwt.exceptions.DecodeError,                     # invalid token
+            jwt.exceptions.InvalidSignatureError) as error: # invalid signature secret key
+        return jsonify({"message": f"Invalid authentication token: {error}", "code": 400}), 400
+    except KeyError as error:
+        if str(error) == "'topic'":
+            return jsonify({"message": f"Invalid authentication token: {error}", "code": 400}), 400
+        else:
+            return jsonify({"message": f"Missing required keys: {error}", "code": 400}), 400
 
 
 @app.route("/api/v1/forget", methods=["POST"])
+@limiter.limit("5 per minute")
 def forget_password() -> tuple[Response, int]:
-    body = json.loads(request.data.decode())
-    user_email = body["email"]
-    result = database_obj.getRecords({"email": user_email}, "Accounts")
-    if len(result) == 0:
-        return jsonify({"message": "Invalid email address", "code": 400}), 400
-    else:
-        first_name = result[0]["first_name"]
-        # Generate token
-        token = generate_jwt(SECRET_KEY,
-                             30,
-                             {"topic": "reset-password",
-                              "user_id": str(result[0]["_id"])})
-        email_server = MailServer()
-        message_body = load_reset_template()
-        # Form the reset email template
-        message_body = message_body.replace("__EMAIL__", user_email)
-        message_body = message_body.replace("__FIRST_NAME__", first_name)
-        reset_url_link = "http://localhost:3000/reset/" + \
-            token + "&rwnc=qgelgl&pryqvmb=obpbqmxpptloa"
-        message_body = message_body.replace("__LINK__", reset_url_link)
-        message = Message("Reset email password", user_email, message_body)
-        email_server.send(message.get_message())
-        return jsonify({"message": "We have send reset password link to your email", "code": 200}), 200
+    try:
+        body = json.loads(request.data.decode())
+        user_email = body["email"]
+        result = database_obj.getRecords({"email": user_email}, "Accounts")
+        if len(result) == 0:
+            return jsonify({"message": "Invalid email address", "code": 400}), 400
+        else:
+            first_name = result[0]["first_name"]
+            # Generate token
+            token = generate_jwt(SECRET_KEY,
+                                30,
+                                {"topic": "reset-password",
+                                "user_id": str(result[0]["_id"])})
+            email_server = MailServer()
+            message_body = load_reset_template()
+            # Form the reset email template
+            message_body = message_body.replace("__EMAIL__", user_email)
+            message_body = message_body.replace("__FIRST_NAME__", first_name)
+            reset_url_link = BASE_FRONTEND_LINK + "/reset/" + \
+                token + "&rwnc=qgelgl&pryqvmb=obpbqmxpptloa"
+            message_body = message_body.replace("__LINK__", reset_url_link)
+            message = Message("Reset email password", user_email, message_body)
+            t1 = threading.Thread(target=email_server.send,
+                              args=(message.get_message(),))
+            t1.start()
+            return jsonify({"message": "Check your inbox, if provided email is valid you will found the reset email.", "code": 200}), 200
+    except KeyError as error:
+        return jsonify({"message": f"Missing required keys: {error}", "code": 400}), 400
+    except FileNotFoundError as error:
+        log_obj.write_into_log("!", "reset_password_template is missing.")
+        return jsonify({"message": f"Reset template not found.", "code": 400}), 400
 
 
 @app.route("/api/v1/signin", methods=["POST"])
-def check_user() -> dict:
-    # try:
-    body = json.loads(request.data.decode())
-    user_email = body["email"]
-    user_password = body["password"]
-    result = database_obj.getRecords(
-        {"email": user_email, "password": user_password}, "Accounts")
-    if len(result) == 0:
-        return jsonify({"message": "Invalid credentials", "code": 400}), 400
-    thirty_days_in_min = 30*24*60
-    token = generate_jwt(SECRET_KEY, thirty_days_in_min, {
-                         "user_id": str(result[0]["_id"])})
-    return jsonify({"message": "user authenticated successfully", "token": token, "user_id": str(result[0]["_id"]), "code": 200}), 200
+@limiter.limit("5 per minute")
+def signin() -> Response:
+    try:
+        body = json.loads(request.data.decode())
+        user_email = body["email"]
+        user_password = body["password"]
+        result = database_obj.getRecords(
+            {"email": user_email, "password": user_password}, "Accounts")
+        if len(result) == 0:
+            return jsonify({"message": "Invalid credentials", "code": 400}), 400
+        time_windo = 30*24*60 # thirty days in minutes
+        token = generate_jwt(SECRET_KEY, time_windo, {
+                            "user_id": str(result[0]["_id"])})
+        return jsonify({"message": "User authenticated successfully", "token": token, "user_id": str(result[0]["_id"]), "code": 200}), 200
+    except KeyError as error:
+        return jsonify({"message": f"Missing required keys: {error}", "code": 400}), 400
 
 
 @app.route("/api/v1/signup", methods=["POST"])
 def signup():
-    body = json.loads(request.data.decode())
     try:
+        body = json.loads(request.data.decode())
         new_account = {
             "email": body["email"],
             "password": body["password"],
@@ -126,8 +146,15 @@ def signup():
         # Adding system fields
         new_account["creation_time"] = str(current_time())
         new_account["last_modification_time"] = str(current_time())
-        # Adding account to database
-        result = database_obj.createRecord(new_account, "Accounts")
+
+        # Handling Duplicate Accounts by the following lines
+        # because Mongodb indexes are not working for no reason. :'(
+        result = database_obj.getRecords({"email": body["email"]}, "Accounts")
+        if len(result) == 0:
+            # Adding account to database
+            result = database_obj.createRecord(new_account, "Accounts")
+        else:
+            return jsonify({"message": f"Duplicated Account.", "code": 400}), 400 
         # Send confirmation email to email address
         email_server = MailServer()
         message_body = load_confirmation_template()
@@ -136,57 +163,45 @@ def signup():
         token = generate_jwt(SECRET_KEY, 10, {"topic": "confirmation",
                                               "account_id": str(result),
                                               "email": body["email"]})
-        conf_link = "http://localhost:3000/confirmation/" + token + "&rwnc=pfdkrm"
+        conf_link = BASE_FRONTEND_LINK + "/confirmation/" + token + "&rwnc=pfdkrm"
         message_body = message_body.replace("__CONFIRMATION_LINK__", conf_link)
         message = Message("Confirmation Email", body["email"], message_body)
-        # email_server.send(message.get_message())
         t1 = threading.Thread(target=email_server.send,
                               args=(message.get_message(),))
         t1.start()
-        return jsonify({"message": "Account created successfully and mail sent",
+        return jsonify({"message": "Account created successfully.",
                         "account_id": str(result),
                         "code": 201}), 201
-    except Exception as error:
-        return jsonify({"message": "Duplicated email", "code": 400}), 400
+    except KeyError as error:
+        return jsonify({"message": f"Missing required keys: {error}", "code": 400}), 400
+    except FileNotFoundError:
+        log_obj.write_into_log("!", "Confirmation_template is missing.")
+        return jsonify({"message": f"Rconfirmation template not found.", "code": 400}), 400
 
 
-@app.route("/api/v1/account/<id>", methods=["PUT"])
-@token_required
-def update_account(id):
-    body = json.loads(request.data.decode())
-    try:
-        database_obj.updateRecord(ObjectId(id), body, "Accounts")
-        return jsonify({"message": "Account updated successfully"}), 200
-    except Exception as error:
-        return jsonify({"message": str(error), "code": 400}), 400
-
-
-@app.route("/api/v1/account/<id>", methods=["GET"])
-@token_required
-def get_account(id):
-    try:
-        result = database_obj.getRecordById(ObjectId(id), "Accounts")
-        result["_id"] = str(result["_id"])
-        return jsonify({"data": result, "code": 200}), 200
-    except Exception as error:
-        return jsonify({"message": str(error), "code": 400}), 400
-
-
-@app.route("/api/v1/confirmation/gen", methods=["GET"])
+@app.route("/api/v1/confirmation/gen", methods=["POST"])
+@limiter.limit("5 per minute")
 def generate_confirmation_token():
-    body = json.loads(request.data.decode())
-    account_id = body["account_id"]
-    record = database_obj.getRecords({"_id": ObjectId(account_id)}, "Accounts")
-    email = record[0]["email"]
-    if record[0]["is_confirmed"] == False:
-        token = generate_jwt(SECRET_KEY, 10, {"topic": "confirmation",
-                                              "account_id": account_id,
-                                              "email": email})
-        conf_link = "http://localhost:3000/confirmation/" + token + "&rwnc=pfdkrm"
-        return jsonify({"message": "Account is already confirmed",
-                        "confirmation_link": conf_link, "code": 200}), 200
-    else:
-        return jsonify({"message": "Account is already confirmed", "code": 400}), 400
+    try:
+        body = json.loads(request.data.decode())
+        account_id = body["account_id"]
+        record = database_obj.getRecords({"_id": ObjectId(account_id)}, "Accounts")
+        email = record[0]["email"]
+        # check if account is new and not confirmed before that.
+        if record[0]["is_confirmed"] == False:
+            # generate a new confirmation token with new time window.
+            token = generate_jwt(SECRET_KEY, 10, {"topic": "confirmation",
+                                                "account_id": account_id,
+                                                "email": email})
+            conf_link = BASE_FRONTEND_LINK + "/confirmation/" + token + "&rwnc=pfdkrm"
+            return jsonify({"message": "Link created successfully",
+                            "confirmation_link": conf_link, "code": 200}), 200
+        else:
+            return jsonify({"message": "Account is already confirmed", "code": 400}), 400
+    except KeyError as error:
+        return jsonify({"message": f"Missing required keys: {error}", "code": 400}), 400
+    except bson.errors.InvalidId:
+        return jsonify({"message": f"Invalid account id", "code": 400}), 400
 
 
 @app.route("/api/v1/confirmation/<token>", methods=["POST"])
@@ -195,9 +210,13 @@ def confirmation(token):
         result = decode_jwt(SECRET_KEY, token)
         account_id = result["account_id"]
         topic = result["topic"]
+        # check if the token topic is for confirmation.
         if topic == "confirmation":
             account_record = database_obj.getRecordById(
                 ObjectId(account_id), "Accounts")
+            if len(account_record) == 0:
+                return jsonify({"message": f"Invalid account id: {error}", "code": 400}), 400
+            # check if the account is not confirmed.
             confirmation_status = account_record["is_confirmed"]
             if confirmation_status:
                 return jsonify({"message": "This Account is already confirmed", "code": 400}), 400
@@ -205,77 +224,17 @@ def confirmation(token):
                 database_obj.updateRecord(ObjectId(account_id), {
                                           "is_confirmed": True}, "Accounts")
                 return jsonify({"message": "Account confirmed successfully", "code": 200}), 200
+    except KeyError as error:
+        if str(error) == "'topic'":
+            return jsonify({"message": f"Invalid authentication token: {error}", "code": 400}), 400
+        else:
+            return jsonify({"message": f"Missing required keys: {error}", "code": 400}), 400
     except Exception as error:
         return jsonify({"message": "Token expired!", "code": 400}), 400
 
+# ================================================================= # 
 
-@app.route("/api/v1/room", methods=["POST"])
-@token_required
-def create_room():
-    body = json.loads(request.data.decode())
-    try:
-        generated_room_id = generate_id()
-        while generated_room_id != None:
-            result = database_obj.getRecords(
-                {"room_id": generated_room_id}, "ٌRooms")
-            if len(result) != 0:
-                generated_room_id = generate_id()
-                continue
-            else:
-                break
-        # TODO: implement required functions for scheduling rooms
-        new_room = {
-            "invitation_link": "http://localhost:3000/" + generated_room_id,
-            "room_id": generated_room_id,
-            "is_ended": False,
-            "type": body["type"],
-            "members": {},
-            "room_admin": body["room_admin"],
-            "creation_time": str(current_time())
-        }
-        result = database_obj.createRecord(new_room, "Rooms")
-        return jsonify({"message": "room created successfully", "room_id": str("result"), "code": 201}), 201
-    except Exception as error:
-        return jsonify({"message": str(error), "code": 400}), 400
+if __name__ == "__main__":
+    app.run(debug=True, ssl_context=('cert.pem', 'key.pem'), threaded=True) 
 
-
-@app.route("/api/v1/room/<room_id>", methods=["GET"])
-@token_required
-def get_room(room_id):
-    try:
-        result = database_obj.getRecords({"room_id": room_id}, "Rooms")
-        if len(result) == 0:
-            return jsonify({"message": "Invalid room ID", "code": 400}), 400
-        result[0]["_id"] = str(result[0]["_id"])
-        return jsonify({"message": "room retrieved successfully", "data": result, "code": 200}), 200
-    except Exception as error:
-        return jsonify({"message": str(error), "code": 400}), 400
-
-
-@app.route("/api/v1/room/<room_id>", methods=["PUT"])
-@token_required
-def update_room(room_id):
-    try:
-        body = json.loads(request.data.decode())
-        result = database_obj.updateRecord(ObjectId(room_id), body, "Rooms")
-        if result != -1:
-            return jsonify({"message": "room updated successfully", "code": 200}), 200
-        return jsonify({"message": "Invalid room ID", "code": 400}), 400
-    except Exception as error:
-        return jsonify({"message": str(error), "code": 400}), 400
-
-
-@app.route("/api/v1/room/<room_id>", methods=["DELETE"])
-@token_required
-def delete_room(room_id):
-    try:
-        result = database_obj.deleteRecordById(ObjectId(room_id), "Rooms")
-        if result is None:
-            return jsonify({"message": "Invalid room ID", "code": 400}), 400
-        return jsonify({"message": "room deleted successfully", "code": 200}), 200
-    except Exception as error:
-        return jsonify({"message": str(error), "code": 400}), 400
-
-
-if __name__ == '__main__':
-    app.run(debug=True, ssl_context=('cert.pem', 'key.pem'))
+# لقطة الختاااام, مسك الختام, مسك الختااااااااام, خلااااااااص خلااااااااص خلااااااااااااااااص رضخت اخيرا

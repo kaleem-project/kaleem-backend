@@ -2,6 +2,10 @@
     "secret_key": "5a26829c32d8d2e27330612f4270ffef62e0ef200a6f634d3a7009b8dbdf434e",
     "time_window_in_minuts": 43200,
     "DB_URI": "mongodb://localhost:27017",
-    "DB_NAME": "database"
-
+    "DB_NAME": "database",
+    "frontend_link": "http://localhost:3000",
+    "mail_server_email": "ahmed123mah@yahoo.com",
+    "mail_server_password": "jupbynibwqsstzeg",
+    "mail_server_host": "smtp.mail.yahoo.com",
+    "mail_server_port": 465
 }

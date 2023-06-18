@@ -1,5 +1,10 @@
 __pycache__
-/test
+/tests
 cert.pem
 key.pem
 README.md
+
+# ignore all logs files.
+/logging_api/logs/*.txt
+/temp
+/temp/*

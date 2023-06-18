@@ -3,11 +3,16 @@ import jwt
 from functools import wraps
 from flask import Flask, request, jsonify
 import datetime
+from pathlib import Path
 import json
 import os
 
-#TODO: don't forget to delete this line.
-secret = "5a26829c32d8d2e27330612f4270ffef62e0ef200a6f634d3a7009b8dbdf434e"
+# load secret from configuration
+base_dir = Path(__file__).resolve().parent.parent
+config_path = base_dir / "configs.json"
+with open(str(config_path), "r") as json_file:
+    conf = json.load(json_file)
+secret = conf["secret_key"]
 
 def generate_jwt(secret: str, time_window: int, payload: dict) -> str:
     expiration_time = datetime.datetime.now() + datetime.timedelta(minutes=time_window)
