@@ -6,7 +6,7 @@ Our graduation project API is an integral component of a real-time communication
 ### Features and Functionalities:
 - Logging system
 - Authentication using JWT.
-- Dealing with Database. you can look about external database API [here](https://github.com/kaleem-project/kaleem-database-api)
+- Dealing with Database. you can look at external database API [here](https://github.com/kaleem-project/kaleem-database-api)
 - Using SSL.
 - Rate limiting.
 
