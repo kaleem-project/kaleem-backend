@@ -2,9 +2,8 @@ __pycache__
 /tests
 cert.pem
 key.pem
-
+configs.json
 # ignore all logs files.
 /logging_api/logs/*.txt
 /temp
 /temp/*
-configs.json
