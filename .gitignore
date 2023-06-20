@@ -7,3 +7,4 @@ key.pem
 /logging_api/logs/*.txt
 /temp
 /temp/*
+configs.json

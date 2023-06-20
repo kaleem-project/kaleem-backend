@@ -3,7 +3,7 @@
     "time_window_in_minuts": 43200,
     "DB_URI": "mongodb://localhost:27017",
     "DB_NAME": "database",
-    "frontend_link": "http://localhost:3000",
+    "frontend_link": "https://localhost:3000",
     "mail_server_email": "ahmed123mah@yahoo.com",
     "mail_server_password": "jupbynibwqsstzeg",
     "mail_server_host": "smtp.mail.yahoo.com",
